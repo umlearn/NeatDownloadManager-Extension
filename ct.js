@@ -30,6 +30,9 @@ M.s = function () {
             if (!this.clipParents) {
                 this.clipParents = [];
                 for (var parent = this.l.parentElement; parent; parent = parent.parentElement) {
+                    // The root scrolling elements are bounded by the viewport above. On
+                    // YouTube, body can have zero layout height while its video is visible.
+                    if (parent === document.body || parent === document.documentElement) continue;
                     var css = getComputedStyle(parent);
                     var x = /(auto|scroll|hidden|clip)/.test(css.overflowX);
                     var y = /(auto|scroll|hidden|clip)/.test(css.overflowY);
@@ -250,7 +253,7 @@ NeatPanelTracker.prototype.dispose = function () {
 if (!window.m) {
     var blockedHosts = []; var N = function () {
         this.Y = null; this.D = {}; this.h = {}; this.M = !1; this.U = this.T = -1; this.Counter = 1; this.j = null; this.aa = 0; this.C = !0; this.ea = []; this.port = chrome.runtime.connect({ name: "neat" }); this.ba = Math.ceil(2E6 * Math.random()); this.port.onMessage.addListener(this.V.bind(this)); this.port.onDisconnect.addListener(this.W.bind(this)); chrome.storage.local.get(["blockedHosts"], function (result) { blockedHosts = result.blockedHosts || [] }); chrome.storage.onChanged.addListener(function (changes, namespace) { if (namespace === "local" && changes.blockedHosts) { blockedHosts = changes.blockedHosts.newValue || [] } }); if (u()) { var a = this; this.ma = new window.MutationObserver(function (b) { b.forEach(function (d) { a.ja(d.target) }) }); this.ma.observe(document, { childList: !0, subtree: !0 }) } this.m(window,
-            "keydown", this.R, !0); this.m(window, "keyup", this.R, !0); this.m(window, "mouseup", this.P, !0); this.m(window, "resize", this.na); this.m(document, "DOMContentLoaded", this.X); this.m(document, "click", this.la)
+            "keydown", this.R, !0); this.m(window, "keyup", this.R, !0); this.m(window, "mouseup", this.P, !0); this.m(window, "resize", this.na); this.m(document, "DOMContentLoaded", this.X); this.m(document, "click", this.la); this.m(document, "play", this.onMediaActive, true); this.m(document, "loadedmetadata", this.onMediaActive, true)
     }; window.m = !0; M = N.prototype; M.ka = function (a, b) { b.hd && this.G({ id: B(b.hd), 1: "GET", 2: b.hd, fEx: "mp4", 4: " MP4 File HQ" }, window.location.href, a, !1); b.sd && this.G({ id: B(b.sd), 1: "GET", 2: b.sd, fEx: "mp4", 4: " MP4 File LQ" }, window.location.href, a, !1) }; M.ga = function (a) {
         for (; (a = a.parentElement) && 1 > a.querySelectorAll("video").length;);
         if (a) return a.querySelectorAll("video")[0]
@@ -260,18 +263,74 @@ if (!window.m) {
     }; M.K = function (a) { return this.D[a] }; M.va = function () { this.port.postMessage([2, this.Y, window.location.href, this.getTitle()]) }; M.X = function () {
         for (var a = this, b = document.getElementsByTagName("SCRIPT"), d, f, g, k = /"progressive":\s*\[/, l = 0; l < b.length; l++)if (d = b[l], 0 <= document.location.host.toLowerCase().indexOf("vimeo") && !d.src && k.test(d.innerText) && (d =
             d.innerText, f = d.indexOf('"progressive"'), !(0 > f || (g = d.indexOf("]", f), 0 > g)))) { d = d.substr(f, g - f + 1); f = null; try { f = JSON.parse("{" + d + "}") } catch (p) { } if (f) { var n = f.progressive; n && setTimeout(function () { for (var p = 0; p < n.length; p++)a.G({ id: B(n[p].url), 1: "GET", 2: n[p].url, fEx: "mp4", 4: "MP4 File " + n[p].quality }, window.location.href, null, !1) }, 2E3); break } }
-    }; M.Z = function (a) { var b = this.h[a]; if (b) { try { if (this.panelTracker) this.panelTracker.unwatch(b); b.g.remove(); } catch (d) { } delete this.h[a]; if (!Object.keys(this.h).length && this.panelTracker) { this.panelTracker.dispose(); this.panelTracker = null; } } }; M.ia = function (a) {
-        (a = this.D[a]) && this.port.postMessage([6,
-            a, window.location.href, this.getTitle(), K(a)])
-    }; M.fa = function (a, b) {
-        var d = null, f = ["VIDEO", "AUDIO", "OBJECT", "EMBED"]; try {
-            var g = document.activeElement, k = 0, l, n, p = g && 0 <= f.indexOf(g.tagName) ? g : null; p ||= (g = document.elementFromPoint(this.T, this.U)) && 0 <= f.indexOf(g.tagName) ? g : null; for (var v = 0; v < f.length; v++) {
-                for (var E = document.getElementsByTagName(f[v]), z = 0; z < E.length; z++)if (g = E[z], 3 != v || "application/x-shockwave-flash" == g.type.toLowerCase()) {
-                    var A = g.src || g.data; if (A && (A == a || A == b)) { var F = g; break } if (p || G) var G =
-                        g; else { var w = g.clientWidth, x = g.clientHeight; if (w && x) { var H = window.getComputedStyle(g); if (!H || "hidden" != H.visibility) { var I = w * x; x < 1.4 * w && w < 3 * x && I > k && (k = I, l = g); n ||= g } } }
-                } if (F) break
-            } (d = F || p || G || l || n) || (d = document.querySelectorAll("video,audio")[0]); if (!d) return null; if ("EMBED" == d.tagName && !d.clientWidth && !d.clientHeight) { var J = d.parentElement; "OBJECT" == J.tagName && (d = J) } return d
-        } catch (O) { return null }
+    }; M.Z = function (a) { var b = this.h[a]; if (b) { try { if (this.panelTracker) this.panelTracker.unwatch(b); b.g.remove(); } catch (d) { } delete this.h[a]; if (!Object.keys(this.h).length && this.panelTracker) { this.panelTracker.dispose(); this.panelTracker = null; } } }; M.mediaTitles = function (id) {
+        var panel = Object.values(this.h).find(function (entry) { return entry.items.includes(id); });
+        var media = panel && panel.l;
+        var titles = media ? [media.getAttribute('title'), media.getAttribute('aria-label')] : [];
+        for (var selector of ['meta[property="og:video:title"]', 'meta[property="og:title"]',
+            'meta[name="twitter:title"]']) {
+            var meta = document.querySelector(selector);
+            if (meta) titles.push(meta.content);
+        }
+        return titles.filter(Boolean);
+    }; M.ia = function (id) {
+        var resource = this.D[id];
+        if (resource) this.port.postMessage([6, resource, window.location.href,
+            this.getTitle(), K(resource), this.mediaTitles(id)]);
+    }; M.mediaElements = function () {
+        var found = Array.from(document.querySelectorAll('video,audio'));
+        // Traverse open shadow roots only; closed roots cannot be inspected by a content script.
+        var roots = [document], visited = 0;
+        while (roots.length && visited < 5000) {
+            var root = roots.shift();
+            var walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+            for (var element = walker.nextNode(); element && visited < 5000; element = walker.nextNode()) {
+                visited++;
+                if (element.shadowRoot) {
+                    found.push.apply(found, element.shadowRoot.querySelectorAll('video,audio'));
+                    roots.push(element.shadowRoot);
+                }
+            }
+        }
+        return Array.from(new Set(found)).filter(function (element) { return element.isConnected; });
+    }; M.fa = function (url, pageUrl) {
+        var media = this.mediaElements();
+        function matches(element, candidate) {
+            if (!candidate) return false;
+            var sources = [element.currentSrc, element.src, element.getAttribute('src')];
+            for (var source of element.querySelectorAll('source')) sources.push(source.src);
+            return sources.some(function (source) {
+                try { return source && new URL(source, document.baseURI).href === candidate; }
+                catch (error) { return false; }
+            });
+        }
+        var exact = media.find(function (element) { return matches(element, url) || matches(element, pageUrl); });
+        if (exact) return exact;
+        var clicked = document.elementFromPoint(this.T || -1, this.U || -1);
+        if (clicked) {
+            var near = media.find(function (element) { return element === clicked || element.contains(clicked); });
+            if (near) return near;
+        }
+        if (this.lastActiveMedia && this.lastActiveMedia.isConnected && !this.lastActiveMedia.paused)
+            return this.lastActiveMedia;
+        var visible = media.filter(function (element) {
+            var box = element.getBoundingClientRect();
+            return box.width > 100 && box.height > 60 && box.bottom > 0 && box.top < innerHeight;
+        });
+        return visible.length === 1 ? visible[0] : null;
+    }; M.onMediaActive = function (event) {
+        if (event.target instanceof HTMLMediaElement) {
+            if (event.type === 'play') this.lastActiveMedia = event.target;
+            var panel = this.h[0];
+            if (panel && panel.g && !panel.l && this.mediaElements().length === 1) {
+                panel.l = event.target;
+                if (this.panelTracker) {
+                    this.panelTracker.unwatch(panel);
+                    this.panelTracker.watch(panel);
+                }
+                panel.s();
+            }
+        }
     }; M.ha = function (a) {
         try {
             var b = parseInt(a.getAttribute("JM_NEAT")); b || (b = this.ba << 10 | this.Counter++, a.setAttribute("JM_NEAT",
@@ -281,22 +340,27 @@ if (!window.m) {
     M.trackPanels = function () {
         if (!this.panelTracker) this.panelTracker = new NeatPanelTracker(this);
         for (var id in this.h) if (this.h[id].g) this.panelTracker.watch(this.h[id]);
-    }; function c(a, b) { return 18 > Math.abs(a.left - b.left) && 18 > Math.abs(a.top - b.top) } M.G = function (a, b, d, f) {
-        if (blockedHosts && blockedHosts.length > 0) { var currentHostname = window.location.hostname; var isBlocked = blockedHosts.some(function (host) { var blockRegex = new RegExp("(^|\\.)" + host.replace(/\./g, "\\.") + "$", "i"); return blockRegex.test(currentHostname) }); if (isBlocked) { return } } var g = this, k = -1, l = null, n; f = f && RegExp(".*facebook.com$|.*vimeo.com$|.*youtube.com$", "i").test(window.location.host) && !(a.fEx && "VTT" == a.fEx.toUpperCase()) && !(!a.fS || 5242880 < a.fS); if (a.fEx && ("VTT" == a.fEx.toUpperCase() || "SRT" == a.fEx.toUpperCase())) {
-            if (0 <=
-                window.location.host.toLowerCase().indexOf("youtube.")) return; this.aa++; if (2 < this.aa) return
-        } if (!(0 <= window.location.host.toLowerCase().indexOf("youtube.com"))) {
-            a.id || (a.id = B(a["2"])); d ||= this.fa(a["2"], b); if (!d) for (n in this.h) { l = this.h[n]; k = n; break } if (!d && !l) { if (f) return; l = new L(g, null, 0) } else if (!l) if (k = this.ha(d), l = this.h[k], !l) {
-                if (f) return; l = new L(g, d, k); b = d.getBoundingClientRect(); d = { left: b.left + 8, top: b.top + 8 }; for (n in this.h) if (n && n != k && (b = this.h[n], c(d, b.position))) {
-                    for (d = 0; d < b.items.length; d++)l.J(b.items[d]);
-                    this.Z(n); break
-                } if (0 != k && this.h[0]) { b = this.h[0]; for (d = 0; d < b.items.length; d++)l.J(b.items[d]); this.Z(0) }
-            } else { if (f) { l.s(); return } } else if (f) { l.s(); return } g.D[a.id] = a; l.J(a.id); this.trackPanels()
+    }; M.G = function (resource, pageUrl, anchor) {
+        // NDM does not support YouTube playback downloads; keep its player clear.
+        if (/(^|\.)(youtube\.com|youtube-nocookie\.com)$/i.test(location.hostname)) return;
+        if (blockedHosts.some(function (host) {
+            var escaped = host.replace(/\./g, '\\.');
+            return new RegExp('(^|\\.)' + escaped + '$', 'i').test(window.location.hostname);
+        })) return;
+        if (resource.fEx && /^(VTT|SRT)$/i.test(resource.fEx)) {
+            if (++this.aa > 2) return;
         }
+        resource.id ||= resource["2"];
+        anchor ||= this.fa(resource["2"], pageUrl);
+        var id = anchor ? this.ha(anchor) : this.h[0] && this.h[0].l ? 'page' : 0;
+        var panel = this.h[id] || new L(this, anchor || null, id);
+        this.D[resource.id] = resource;
+        panel.J(resource.id);
+        this.trackPanels();
     }; M.V = function (a) {
         var b = this; switch (a[0]) {
             case 1: b.G(a[1],
-                a[2], null, !0); break; case 3: (a = a[1]) && (b.Y = a); b.va(); break; case 5: b.$(); break; case 11: b.ua(); 0 <= (new URL(window.location.href)).hostname.toLowerCase().indexOf("youtube.") || setTimeout(function () { b.X() }, 2500); break; case 13: a = a[1]; a != b.C && (b.C = a, b.$()); break; case 15: alert("Extension Can't Connect to NeatDownloadManager Application, You Can : \r\n1- Check If NeatDownloadManager is Running.\r\n2- or Hold down Delete-Key and click on the Download link.\r\n3- or Disable NeatDownloadManager Extension temporarily.")
+                a[2], null, !0); break; case 3: (a = a[1]) && (b.Y = a); b.va(); break; case 5: b.$(); break; case 11: b.ua(); setTimeout(function () { b.X() }, 2500); break; case 13: a = a[1]; a != b.C && (b.C = a, b.$()); break; case 15: alert("Extension Can't Connect to NeatDownloadManager Application, You Can : \r\n1- Check If NeatDownloadManager is Running.\r\n2- or Hold down Delete-Key and click on the Download link.\r\n3- or Disable NeatDownloadManager Extension temporarily."); break;
         }
     };
     M.m = function (a) { var b = Array.prototype.slice.call(arguments); b[2] = b[2].bind(this); this.ea.push(b); a.addEventListener.apply(a, b.slice(1)) }; M.la = function () { for (var a in this.h) this.h[a].I(!0) }; M.ua = function () {
@@ -310,9 +374,12 @@ if (!window.m) {
     }; new N
 };
 
-// keydown → sendMessage: SW 端写入 storage.session，避开 content script 的存储访问限制。
-// Ctrl/Alt/Meta/Shift 被按下时立即通知 SW，后续 3 秒内所有点击均被绕过。
-document.addEventListener("keydown", function(e) {
-  if (!(e.ctrlKey || e.altKey || e.metaKey || e.shiftKey)) return;
-  chrome.runtime.sendMessage({ action: "__ndm_bypass" });
-}, true);
+// Limit modifier-key bypass to the link the user actually activates.
+function notifyBypass(event) {
+    if (!(event.ctrlKey || event.altKey || event.metaKey || event.shiftKey)) return;
+    var link = event.target.closest && event.target.closest('a[href]');
+    if (link && /^https?:$/.test(link.protocol))
+        chrome.runtime.sendMessage({ action: "__ndm_bypass", url: link.href });
+}
+document.addEventListener('pointerdown', notifyBypass, true);
+document.addEventListener('click', notifyBypass, true);
