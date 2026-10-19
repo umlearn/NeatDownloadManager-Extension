@@ -77,7 +77,7 @@ function M() { for (var a = {}, b = 0; b < arguments.length; b++)for (var c in a
 async function R(a, b) { var c = null, d = {}, e, f = b && b["1"] || "GET"; if (b && (e = b.o)) for (var g = 0; g < e.length; g++)N(e[g].name.toLowerCase(), "x-") && (d[e[g].name] = e[g].value); if ("POST" == f && b) { try { S(b, b), b["10"] && (d["Content-Type"] = b["10"]) } catch (m) { } b && b.postData && (c = b.postData) } try { const m = await fetch(a["2"], { method: f, credentials: "include", headers: new Headers(d), body: c }); if (m.ok) { let u = await m.text(); (a.S || function () { })(u) } } catch (m) { } }
 function T() { this["1"] = "GET"; this["2"] = ""; this["3"] = ""; this["4"] = ""; this["5"] = ""; this["6"] = "normal"; this["7"] = 0; this["8"] = ""; this["9"] = ""; this["10"] = ""; this.cookies = this["11"] = ""; this.postData = null }
 function U() {
-    var a = this.constructor.prototype, b; for (b in a) this[b] = a[b].bind(this); this.H = {}; this.h = {}; this.m = {}; this.hlsSeen = new Map(); this.sentMedia = new Map(); this.pendingMedia = new Map(); this.fa = 1; this.u = ""; this.C = !1; chrome.contextMenus.removeAll(); chrome.contextMenus.create({ title: "Download", id: "NDM_CtxMenu", contexts: ["link", "image"] }); chrome.contextMenus.create({ id: "NDM_BlockSite", title: "Block downloads", contexts: ["all"] }); this.j(chrome.contextMenus.onClicked, this.W); this.j(chrome.downloads.onCreated, this.X); this.j(chrome.runtime.onConnect, this.Z); this.j(chrome.webRequest.onBeforeRequest, this.T, {
+    var a = this.constructor.prototype, b; for (b in a) this[b] = a[b].bind(this); this.H = {}; this.h = {}; this.m = {}; this.hlsSeen = new Map(); this.hlsProbes = new Map(); this.nextHlsProbe = 1; this.sentMedia = new Map(); this.pendingMedia = new Map(); this.fa = 1; this.u = ""; this.C = !1; chrome.contextMenus.removeAll(); chrome.contextMenus.create({ title: "Download", id: "NDM_CtxMenu", contexts: ["link", "image"] }); chrome.contextMenus.create({ id: "NDM_BlockSite", title: "Block downloads", contexts: ["all"] }); this.j(chrome.contextMenus.onClicked, this.W); this.j(chrome.downloads.onCreated, this.X); this.j(chrome.runtime.onConnect, this.Z); this.j(chrome.webRequest.onBeforeRequest, this.T, {
         urls: ["http://*/*", "https://*/*", "ftp://*/*"],
         types: w
     }, ["requestBody"]); this.j(chrome.webRequest.onBeforeSendHeaders, this.U, { urls: ["https://*/*", "http://*/*"], types: w }, ["requestHeaders"]); this.j(chrome.webRequest.onHeadersReceived, this.V, { urls: ["<all_urls>"], types: w }, ["responseHeaders"]); this.j(chrome.webRequest.onCompleted, this.N, { urls: ["<all_urls>"] }); this.j(chrome.webRequest.onErrorOccurred, this.N, { urls: ["<all_urls>"] }); this.j(chrome.webNavigation.onHistoryStateUpdated, this.Y); chrome.action.onClicked.addListener(this.M); this.v = !1; chrome.action.setBadgeBackgroundColor({ color: "#FF3333" });
@@ -122,6 +122,24 @@ X.i = function (a, text) {
     a.id = key;
     port.postMessage([1, a, port["2"]]);
 }; V.N = function (a) { delete this.m[a.requestId] };
+V.probeHlsInFrame = function (request) {
+    var port = this.h[[request.tabId, request.frameId]];
+    if (!port) return Promise.resolve(null);
+    var self = this, id = this.nextHlsProbe++;
+    return new Promise(function (resolve) {
+        var timer = setTimeout(function () {
+            self.hlsProbes.delete(id);
+            resolve({ error: "frame timeout" });
+        }, 8000);
+        self.hlsProbes.set(id, { port: port, resolve: resolve, timer: timer });
+        try { port.postMessage([17, id, request.url]); }
+        catch (error) {
+            clearTimeout(timer);
+            self.hlsProbes.delete(id);
+            resolve({ error: "frame unavailable" });
+        }
+    });
+};
 V.processHls = async function (request, mime) {
     var key = request.tabId + ":" + request.frameId + ":" + request.url;
     var now = Date.now();
@@ -136,15 +154,29 @@ V.processHls = async function (request, mime) {
     try {
         var headers = new Headers();
         for (var header of request.headers || [])
-            if (/^x-/i.test(header.name) && header.value) headers.set(header.name, header.value);
+            if (/^(?:x-|authorization$|accept$)/i.test(header.name) && header.value)
+                headers.set(header.name, header.value);
         var response = await fetch(request.url, { credentials: "include", headers: headers, signal: controller.signal });
         var length = Number(response.headers.get("Content-Length"));
         if (response.ok && (!length || length <= 1048576)) {
             var text = await readPlaylistLimited(response, 1048576);
             if (text !== null) parsed = NeatMedia.parseHls(request.url, text);
-        } else request.fetchError = response.status || "too large";
+            request.fetchError = text === null ? "too large" : parsed ? "" : "invalid playlist";
+        } else request.fetchError = response.ok ? "too large" : "HTTP " + response.status;
     } catch (error) { request.fetchError = error.name === "AbortError" ? "timeout" : "fetch failed"; }
     finally { clearTimeout(timeout); }
+    if (!parsed) {
+        var frameResult = await this.probeHlsInFrame(request);
+        if (frameResult) {
+            if (frameResult.text) parsed = NeatMedia.parseHls(request.url, frameResult.text);
+            if (parsed) request.fetchError = "";
+            else {
+                var frameError = frameResult.error || "invalid playlist";
+                request.fetchError = request.fetchError && request.fetchError !== frameError ?
+                    request.fetchError + " / " + frameError : frameError;
+            }
+        }
+    }
     this.emitHls(request, mime, parsed);
 };
 async function readPlaylistLimited(response, limit) {
@@ -173,10 +205,7 @@ V.emitHls = function (request, mime, parsed) {
     if (request.headers) Y({ o: request.headers }, base);
     if (!parsed || !parsed.variants.length) {
         if (parsed) {
-            base["4"] += parsed.fragmented ? " · fMP4" : "";
-            base["4"] += parsed.byterange ? " · Byte range" : "";
-            base["4"] += parsed.live ? " · Live" : "";
-            base["4"] += parsed.drm ? " · DRM" : parsed.encrypted ? " · Encrypted" : "";
+            base["4"] = NeatMedia.mediaLabel(parsed);
             base.fDu = parsed.duration ? Math.round(parsed.duration) + " sec" : "";
         }
         this.A(base);
@@ -185,8 +214,7 @@ V.emitHls = function (request, mime, parsed) {
     if (Object.keys(parsed.audio).length || Object.keys(parsed.subtitles).length)
         this.A(Object.assign({}, base, { 4: "HLS master · alternate tracks" }));
     for (var variant of parsed.variants) {
-        var label = ["HLS", variant.resolution, variant.bandwidth ? Math.round(variant.bandwidth / 1000) + " kbps" : "",
-            variant.audio.length ? "audio: " + variant.audio.map(function (track) { return track.language || track.name; }).join(", ") : ""].filter(Boolean).join(" · ");
+        var label = NeatMedia.variantLabel(variant);
         this.A(Object.assign({}, base, { 2: variant.url, 4: label }));
     }
 };
@@ -240,6 +268,15 @@ function Z(a, b) { if (!a) return null; b = b.toLowerCase(); a = a.split(";"); a
 V.Z = function (a) { var b = a.sender.tab; if (b && 0 <= b.id) { var c = a.sender.frameId, d = a.id || this.fa++, e = b.id; a.id = d; a["4"] = b.title; a.tabId = e; a.frameId = c; a.ia = 0 == c; a["2"] = a.sender.url || a.ia && b.url || null; a.onMessage.addListener(this.aa.bind(this, a)); a.onDisconnect.addListener(this.$.bind(this, a)); this.H[d] = a; this.h[[e, c]] = a; a.postMessage([3, a.id]); a.postMessage([13, this.F]); a.sender = null; for (var [key, media] of this.pendingMedia) if (media.tabId === e && (media.frameId === c || c === 0)) { this.pendingMedia.delete(key); this.A(media); } } };
 V.aa = function (a, b) {
     switch (b[0]) {
+        case 18:
+            var probe = this.hlsProbes.get(b[1]);
+            if (probe && probe.port === a) {
+                clearTimeout(probe.timer);
+                this.hlsProbes.delete(b[1]);
+                probe.resolve({ text: typeof b[2] === "string" && b[2].length <= 1048576 ? b[2] : "",
+                    error: b[3] || "too large" });
+            }
+            break;
         case 2:
             var c = b[2], d = b[3];
             (a = this.H[b[1]]) && c && (a["2"] = c);
@@ -285,7 +322,7 @@ V.aa = function (a, b) {
             } else send();
             break;
     }
-}; V.$ = function (a) { for (var b in this.h) this.h[b] == a && delete this.h[b]; delete this.H[a.id] }; V.la = function (a, b) { var c = this.h; a = a.toString() + ","; for (var d in c) N(d, a) && c[d].postMessage(b) }; V.ga = function (a) { var b = this.h, c; for (c in b) b[c].postMessage(a) }; new U;
+}; V.$ = function (a) { void chrome.runtime.lastError; for (var b in this.h) this.h[b] == a && delete this.h[b]; for (var [id, probe] of this.hlsProbes) if (probe.port === a) { clearTimeout(probe.timer); this.hlsProbes.delete(id); probe.resolve({ error: "frame unavailable" }); } delete this.H[a.id] }; V.la = function (a, b) { var c = this.h; a = a.toString() + ","; for (var d in c) N(d, a) && c[d].postMessage(b) }; V.ga = function (a) { var b = this.h, c; for (c in b) b[c].postMessage(a) }; new U;
 chrome.contextMenus.onClicked.addListener(function (info, tab) {
     if (info.menuItemId === "NDM_BlockSite") {
         var url = tab.url;

@@ -82,7 +82,7 @@ M.create = function () {
             button:hover { background: #ffffff14; }
             button:focus-visible { outline: 2px solid #a1c9ff; outline-offset: -2px; }
             .trigger { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; }
-            .icon { font-size: 16px; line-height: 1; }
+            .icon { display: block; width: 16px; height: 16px; fill: currentColor; }
             .close { width: 0; padding: 0; opacity: 0; overflow: hidden; height: 26px; text-align: center; }
             .panel:hover .close, .panel:focus-within .close, .panel.expanded .close { width: 26px; opacity: 1; }
             .details { display: none; padding-top: 6px; width: 248px; max-width: calc(100vw - 24px); }
@@ -91,12 +91,12 @@ M.create = function () {
                 border: 1px solid #ffffff1f; border-radius: 10px; box-shadow: 0 6px 20px #0003;
                 max-height: min(240px, 40vh); overflow: auto; overscroll-behavior: contain; }
             .download { display: block; width: 100%; border-radius: 6px; padding: 9px 10px;
-                overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+                overflow-wrap: anywhere; }
             @media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
         </style>
         <section class="panel" aria-label="Neat Download Manager">
             <div class="bar"><button class="trigger" type="button" aria-label="显示视频下载选项">
-                <span class="icon" aria-hidden="true">↓</span>
+                <svg class="icon" viewBox="0 0 1024 1024" aria-hidden="true" focusable="false"><path d="M558 171.2v573.7c0 0.1 0.2 0.2 0.2 0.1l208-216.4c16.8-17.5 44.7-18.1 62.2-1.2 17.5 16.8 18.1 44.7 1.2 62.2L546.5 884.2c-8.3 8.6-19.8 13.5-31.7 13.5-12 0-23.4-4.9-31.7-13.5L198.3 588c-8.2-8.5-12.3-19.5-12.3-30.5 0-11.6 4.5-23.1 13.5-31.7 17.5-16.8 45.4-16.3 62.2 1.2l208 216.4c0.1 0.1 0.2 0 0.2-0.1V170.2c0-23.4 18.3-42.5 41.3-43.9 25.6-1.5 46.8 19.4 46.8 44.9z"/></svg>
             </button><button class="close" type="button" aria-label="隐藏下载浮条" title="隐藏">×</button></div>
             <div class="details"><ul class="list" aria-label="可下载媒体"></ul></div>
         </section>`;
@@ -252,8 +252,8 @@ NeatPanelTracker.prototype.dispose = function () {
 };
 if (!window.m) {
     var blockedHosts = []; var N = function () {
-        this.Y = null; this.D = {}; this.h = {}; this.M = !1; this.U = this.T = -1; this.Counter = 1; this.j = null; this.aa = 0; this.C = !0; this.ea = []; this.port = chrome.runtime.connect({ name: "neat" }); this.ba = Math.ceil(2E6 * Math.random()); this.port.onMessage.addListener(this.V.bind(this)); this.port.onDisconnect.addListener(this.W.bind(this)); chrome.storage.local.get(["blockedHosts"], function (result) { blockedHosts = result.blockedHosts || [] }); chrome.storage.onChanged.addListener(function (changes, namespace) { if (namespace === "local" && changes.blockedHosts) { blockedHosts = changes.blockedHosts.newValue || [] } }); if (u()) { var a = this; this.ma = new window.MutationObserver(function (b) { b.forEach(function (d) { a.ja(d.target) }) }); this.ma.observe(document, { childList: !0, subtree: !0 }) } this.m(window,
-            "keydown", this.R, !0); this.m(window, "keyup", this.R, !0); this.m(window, "mouseup", this.P, !0); this.m(window, "resize", this.na); this.m(document, "DOMContentLoaded", this.X); this.m(document, "click", this.la); this.m(document, "play", this.onMediaActive, true); this.m(document, "loadedmetadata", this.onMediaActive, true)
+        this.Y = null; this.D = {}; this.h = {}; this.M = !1; this.U = this.T = -1; this.Counter = 1; this.j = null; this.aa = 0; this.C = !0; this.ea = []; this.port = null; this.pageHidden = false; this.connectPort(); this.ba = Math.ceil(2E6 * Math.random()); chrome.storage.local.get(["blockedHosts"], function (result) { blockedHosts = result.blockedHosts || [] }); chrome.storage.onChanged.addListener(function (changes, namespace) { if (namespace === "local" && changes.blockedHosts) { blockedHosts = changes.blockedHosts.newValue || [] } }); if (u()) { var a = this; this.ma = new window.MutationObserver(function (b) { b.forEach(function (d) { a.ja(d.target) }) }); this.ma.observe(document, { childList: !0, subtree: !0 }) } this.m(window,
+            "keydown", this.R, !0); this.m(window, "keyup", this.R, !0); this.m(window, "mouseup", this.P, !0); this.m(window, "resize", this.na); this.m(window, "pagehide", this.onPageHide); this.m(window, "pageshow", this.onPageShow); this.m(document, "DOMContentLoaded", this.X); this.m(document, "click", this.la); this.m(document, "play", this.onMediaActive, true); this.m(document, "loadedmetadata", this.onMediaActive, true)
     }; window.m = !0; M = N.prototype; M.ka = function (a, b) { b.hd && this.G({ id: B(b.hd), 1: "GET", 2: b.hd, fEx: "mp4", 4: " MP4 File HQ" }, window.location.href, a, !1); b.sd && this.G({ id: B(b.sd), 1: "GET", 2: b.sd, fEx: "mp4", 4: " MP4 File LQ" }, window.location.href, a, !1) }; M.ga = function (a) {
         for (; (a = a.parentElement) && 1 > a.querySelectorAll("video").length;);
         if (a) return a.querySelectorAll("video")[0]
@@ -357,8 +357,42 @@ if (!window.m) {
         this.D[resource.id] = resource;
         panel.J(resource.id);
         this.trackPanels();
+    }; M.probeHls = async function (id, url) {
+        var text = "", error = "", controller = new AbortController();
+        var timer = setTimeout(function () { controller.abort(); }, 7000);
+        try {
+            if (!/^https?:\/\//i.test(url)) throw new Error("invalid URL");
+            var response = await fetch(url, { credentials: "include", signal: controller.signal });
+            if (!response.ok) error = "HTTP " + response.status;
+            else {
+                var reader = response.body && response.body.getReader && response.body.getReader();
+                if (!reader) {
+                    text = await response.text();
+                    if (new TextEncoder().encode(text).length > 1048576) { text = ""; error = "too large"; }
+                } else {
+                    var chunks = [], size = 0;
+                    try {
+                        while (true) {
+                            var part = await reader.read();
+                            if (part.done) break;
+                            size += part.value.byteLength;
+                            if (size > 1048576) { await reader.cancel(); error = "too large"; break; }
+                            chunks.push(part.value);
+                        }
+                        if (!error) {
+                            var bytes = new Uint8Array(size), offset = 0;
+                            for (var chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+                            text = new TextDecoder().decode(bytes);
+                        }
+                    } finally { reader.releaseLock(); }
+                }
+            }
+        } catch (failure) { error = failure.name === "AbortError" ? "frame timeout" : "frame fetch failed"; }
+        finally { clearTimeout(timer); }
+        try { this.port.postMessage([18, id, text, error]); } catch (failure) { }
     }; M.V = function (a) {
         var b = this; switch (a[0]) {
+            case 17: b.probeHls(a[1], a[2]); break;
             case 1: b.G(a[1],
                 a[2], null, !0); break; case 3: (a = a[1]) && (b.Y = a); b.va(); break; case 5: b.$(); break; case 11: b.ua(); setTimeout(function () { b.X() }, 2500); break; case 13: a = a[1]; a != b.C && (b.C = a, b.$()); break; case 15: alert("Extension Can't Connect to NeatDownloadManager Application, You Can : \r\n1- Check If NeatDownloadManager is Running.\r\n2- or Hold down Delete-Key and click on the Download link.\r\n3- or Disable NeatDownloadManager Extension temporarily."); break;
         }
@@ -368,9 +402,25 @@ if (!window.m) {
         this.h = {}; this.D = {};
         if (this.panelTracker) this.panelTracker.dispose();
         this.panelTracker = null;
-    }; M.$ = function () { this.na(); }; M.W = function () {
-        this.port =
-        chrome.runtime.connect({ name: "neat" }); this.port.onMessage.addListener(this.V.bind(this)); this.port.onDisconnect.addListener(this.W.bind(this))
+    }; M.$ = function () { this.na(); }; M.connectPort = function () {
+        if (this.pageHidden || this.port) return;
+        var port = chrome.runtime.connect({ name: "neat" });
+        this.port = port;
+        port.onMessage.addListener(this.V.bind(this));
+        port.onDisconnect.addListener(this.W.bind(this));
+    }; M.onPageHide = function () {
+        this.pageHidden = true;
+        if (this.port) { this.port.disconnect(); this.port = null; }
+    }; M.onPageShow = function (event) {
+        this.pageHidden = false;
+        if (event.persisted || !this.port) this.connectPort();
+        if (event.persisted) this.na();
+    }; M.W = function (port) {
+        var error = chrome.runtime.lastError;
+        if (this.port !== port) return;
+        this.port = null;
+        if (error && /back\/forward cache/i.test(error.message)) this.pageHidden = true;
+        this.connectPort();
     }; new N
 };
 

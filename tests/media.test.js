@@ -4,6 +4,7 @@ const media = require('../media.js');
 
 test('recognizes playlists and excludes common streaming fragments', () => {
     assert.equal(media.kind('https://cdn.test/master.m3u8?token=1', 'application/octet-stream'), 'hls');
+    assert.equal(media.kind('https://cdn.test/master.m3u?token=1', 'application/octet-stream'), 'hls');
     assert.equal(media.kind('https://cdn.test/opaque', 'application/vnd.apple.mpegurl; charset=utf-8'), 'hls');
     assert.equal(media.kind('https://cdn.test/chunk.m4s', 'video/mp4'), 'segment');
     assert.equal(media.kind('https://cdn.test/videoplayback?range=0-999', 'video/mp4'), 'segment');
@@ -24,6 +25,20 @@ test('parses master playlist variants and independent audio groups', () => {
     assert.equal(parsed.variants[0].audio[0].url, 'https://cdn.test/a/en.m3u8');
 });
 
+test('describes advertised HLS resolution, rates, codecs and tracks', () => {
+    const parsed = media.parseHls('https://cdn.test/master.m3u', [
+        '#EXTM3U',
+        '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="sound",NAME="English",LANGUAGE="en",URI="audio.m3u8"',
+        '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Chinese",LANGUAGE="zh",URI="subs.m3u8"',
+        '#EXT-X-STREAM-INF:BANDWIDTH=3000000,AVERAGE-BANDWIDTH=2400000,RESOLUTION=1920x1080,FRAME-RATE=29.970,VIDEO-RANGE=PQ,CODECS="avc1.640028,mp4a.40.2",AUDIO="sound",SUBTITLES="subs"',
+        'video.m3u8'
+    ].join('\n'));
+    assert.equal(parsed.variants[0].averageBandwidth, 2400000);
+    assert.equal(parsed.variants[0].frameRate, 29.97);
+    assert.equal(media.variantLabel(parsed.variants[0]),
+        'HLS · 1920×1080 · 2.4 Mb/s avg · 3 Mb/s peak · 29.97 fps · PQ · H.264+AAC · audio: en · subs: zh');
+});
+
 test('keeps media playlist address for fMP4, byte ranges, and encryption flags', () => {
     const parsed = media.parseHls('https://cdn.test/media.m3u8', [
         '#EXTM3U', '#EXT-X-MAP:URI="init.mp4"',
@@ -38,6 +53,7 @@ test('keeps media playlist address for fMP4, byte ranges, and encryption flags',
     assert.equal(parsed.drm, true);
     assert.equal(parsed.live, false);
     assert.deepEqual(parsed.variants, []);
+    assert.equal(media.mediaLabel(parsed), 'HLS playlist · 4 sec · 1 segment · fMP4 · Byte range · DRM');
 });
 
 test('HLS filename uses a meaningful title and removes unsafe filename characters', () => {

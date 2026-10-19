@@ -48,6 +48,52 @@ var NeatMedia = (function () {
         return "";
     }
 
+    function bitrate(bits) {
+        return bits ? (bits / 1000000).toFixed(2).replace(/0+$/, "").replace(/\.$/, "") + " Mb/s" : "";
+    }
+
+    function codecNames(codecs) {
+        var names = [];
+        for (var codec of (codecs || "").split(",")) {
+            codec = codec.trim();
+            var name = /^(?:avc1|avc3)/i.test(codec) ? "H.264" :
+                /^(?:hvc1|hev1)/i.test(codec) ? "H.265" :
+                /^av01/i.test(codec) ? "AV1" : /^vp0?9/i.test(codec) ? "VP9" :
+                /^mp4a\.40\./i.test(codec) ? "AAC" : /^ec-3/i.test(codec) ? "E-AC-3" :
+                /^ac-3/i.test(codec) ? "AC-3" : /^opus/i.test(codec) ? "Opus" : codec;
+            if (name && !names.includes(name)) names.push(name);
+        }
+        return names.join("+");
+    }
+
+    function variantLabel(variant) {
+        var parts = ["HLS", variant.resolution ? variant.resolution.replace("x", "×") : ""];
+        if (variant.averageBandwidth) parts.push(bitrate(variant.averageBandwidth) + " avg");
+        if (variant.bandwidth) parts.push(bitrate(variant.bandwidth) + " peak");
+        if (variant.frameRate) parts.push(variant.frameRate + " fps");
+        if (variant.videoRange) parts.push(variant.videoRange);
+        if (variant.codecs) parts.push(codecNames(variant.codecs));
+        if (variant.audio.length) parts.push("audio: " + variant.audio.map(function (track) {
+            return track.language || track.name;
+        }).join(", "));
+        if (variant.subtitles.length) parts.push("subs: " + variant.subtitles.map(function (track) {
+            return track.language || track.name;
+        }).join(", "));
+        return parts.filter(Boolean).join(" · ");
+    }
+
+    function mediaLabel(parsed) {
+        var parts = ["HLS playlist"];
+        if (parsed.duration && !parsed.live) parts.push(Math.round(parsed.duration) + " sec");
+        if (parsed.segments) parts.push(parsed.segments + (parsed.segments === 1 ? " segment" : " segments"));
+        if (parsed.live) parts.push("Live");
+        if (parsed.fragmented) parts.push("fMP4");
+        if (parsed.byterange) parts.push("Byte range");
+        if (parsed.drm) parts.push("DRM");
+        else if (parsed.encrypted) parts.push("Encrypted");
+        return parts.join(" · ");
+    }
+
     function parseHls(url, text) {
         var lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).map(function (line) { return line.trim(); });
         if (lines[0] !== "#EXTM3U") return null;
@@ -68,7 +114,9 @@ var NeatMedia = (function () {
                 pending = attributes(line.slice(18));
             } else if (pending && line && line[0] !== "#") {
                 variants.push({ url: new URL(line, url).href, bandwidth: Number(pending.BANDWIDTH) || 0,
-                    resolution: pending.RESOLUTION || "", codecs: pending.CODECS || "",
+                    averageBandwidth: Number(pending["AVERAGE-BANDWIDTH"]) || 0,
+                    resolution: pending.RESOLUTION || "", frameRate: Number(pending["FRAME-RATE"]) || 0,
+                    videoRange: pending["VIDEO-RANGE"] || "", codecs: pending.CODECS || "",
                     audioGroup: pending.AUDIO || "", subtitleGroup: pending.SUBTITLES || "" });
                 pending = null;
             } else if (line.indexOf("#EXTINF:") === 0) {
@@ -91,6 +139,6 @@ var NeatMedia = (function () {
             byterange: byterange, encrypted: encrypted, drm: drm, live: live };
     }
     return { attributes: attributes, kind: kind, parseHls: parseHls,
-        hlsFilename: hlsFilename };
+        hlsFilename: hlsFilename, variantLabel: variantLabel, mediaLabel: mediaLabel };
 })();
 if (typeof module !== "undefined") module.exports = NeatMedia;

@@ -36,9 +36,20 @@ function setup(playlist = '#EXTM3U\n#EXTINF:4,\nseg.ts\n#EXT-X-ENDLIST', connect
         frameId: 0, url: pageUrl }, onMessage: event('portMessage'),
         onDisconnect: event('disconnect'), postMessage(message) { sent.push(message); } };
     if (connect) callbacks.connect[0](port);
-    return { callbacks, sent, wire, context, connect: () => callbacks.connect[0](port),
+    return { callbacks, sent, wire, context, port, connect: () => callbacks.connect[0](port),
         openNative: () => socket.onopen(), nativeWaiting: () => socket.onmessage({ data: 'waiting' }) };
 }
+
+test('reads the Port disconnect error while clearing a cached page connection', () => {
+    const { callbacks, context, port } = setup();
+    let reads = 0;
+    Object.defineProperty(context.chrome.runtime, 'lastError', { get() {
+        reads++;
+        return { message: 'The page keeping the extension port is moved into back/forward cache' };
+    } });
+    callbacks.disconnect[0](port);
+    assert.equal(reads, 1);
+});
 
 function request(callbacks, id, url, type, contentType, length, method = 'GET') {
     const base = { requestId: id, url, tabId: 1, frameId: 0, type,
@@ -83,7 +94,7 @@ test('HLS master preserves a choice containing alternate audio', async () => {
     const candidates = sent.filter(message => message[0] === 1).map(message => message[1]);
     assert.deepEqual(candidates.map(candidate => candidate['2']),
         ['https://cdn.test/master.m3u8', 'https://cdn.test/video.m3u8']);
-    assert.match(candidates[1]['4'], /1280x720/);
+    assert.match(candidates[1]['4'], /1280×720/);
     assert.match(candidates[1]['4'], /audio: en/);
 });
 
@@ -95,6 +106,37 @@ test('candidate discovered before content script connects is delivered later', a
     assert.equal(sent.length, 0);
     connect();
     assert.equal(sent.filter(message => message[0] === 1).length, 1);
+});
+
+test('parses a playlist through the originating frame when worker fetch is rejected', async () => {
+    const { callbacks, sent } = setup(undefined, true,
+        async () => ({ ok: false, status: 403, headers: { get: () => null } }));
+    request(callbacks, 'protected', 'https://cdn.test/protected.m3u8',
+        'xmlhttprequest', 'application/vnd.apple.mpegurl', 120);
+    await new Promise(resolve => setImmediate(resolve));
+    const probe = sent.find(message => message[0] === 17);
+    assert.equal(probe[2], 'https://cdn.test/protected.m3u8');
+    callbacks.portMessage[0]([18, probe[1],
+        '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2000000,RESOLUTION=1280x720\nvideo.m3u8', '']);
+    await new Promise(resolve => setImmediate(resolve));
+    const candidates = sent.filter(message => message[0] === 1).map(message => message[1]);
+    assert.equal(candidates.length, 1);
+    assert.match(candidates[0]['4'], /1280×720/);
+    assert.equal(candidates[0]['2'], 'https://cdn.test/video.m3u8');
+});
+
+test('keeps a concise label and the original URL when both playlist reads fail', async () => {
+    const { callbacks, sent } = setup(undefined, true,
+        async () => ({ ok: false, status: 403, headers: { get: () => null } }));
+    request(callbacks, 'blocked', 'https://cdn.test/blocked.m3u8',
+        'xmlhttprequest', 'application/vnd.apple.mpegurl', 120);
+    await new Promise(resolve => setImmediate(resolve));
+    const probe = sent.find(message => message[0] === 17);
+    callbacks.portMessage[0]([18, probe[1], '', 'frame fetch failed']);
+    await new Promise(resolve => setImmediate(resolve));
+    const candidate = sent.find(message => message[0] === 1)[1];
+    assert.equal(candidate['2'], 'https://cdn.test/blocked.m3u8');
+    assert.equal(candidate['4'], 'HLS playlist · unverified');
 });
 
 test('modifier bypass applies only to the activated link', () => {
