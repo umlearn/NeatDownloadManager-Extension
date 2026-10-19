@@ -260,7 +260,7 @@ if (!window.m) {
     }; M.da = function (a, b) { var d = this; y({ 2: "https://www.facebook.com/video/embed?video_id=" + b, pa: function (f) { var g = /"sd_src_no_ratelimit":"(.*?)"/.exec(f), k = /"hd_src_no_ratelimit":"(.*?)"/.exec(f); g && g.length || (g = /"sd_src":"(.*?)"/.exec(f)); k && k.length || (k = /"hd_src":"(.*?)"/.exec(f)); f = { sd: g && g.length ? g[1].replace(/\\/g, "") : "", hd: k && k.length ? k[1].replace(/\\/g, "") : "" }; g = d.ga(a); void 0 !== g && d.ka(g, f) } }) }; M.ja = function (a) {
         var b = this; a = a.querySelectorAll('a[href*="/videos/"]');
         a.length && Array.from(a, function (d) { if (!d.getAttribute("NEAT_DM")) { d.setAttribute("NEAT_DM", 1); var f = d.href.match(/.*\/videos\/(\d+)\/.*/i); f && b.da(d, f[1]) } })
-    }; M.K = function (a) { return this.D[a] }; M.va = function () { this.port.postMessage([2, this.Y, window.location.href, this.getTitle()]) }; M.X = function () {
+    }; M.K = function (a) { return this.D[a] }; M.va = function () { this.sendPortMessage([2, this.Y, window.location.href, this.getTitle()]) }; M.X = function () {
         for (var a = this, b = document.getElementsByTagName("SCRIPT"), d, f, g, k = /"progressive":\s*\[/, l = 0; l < b.length; l++)if (d = b[l], 0 <= document.location.host.toLowerCase().indexOf("vimeo") && !d.src && k.test(d.innerText) && (d =
             d.innerText, f = d.indexOf('"progressive"'), !(0 > f || (g = d.indexOf("]", f), 0 > g)))) { d = d.substr(f, g - f + 1); f = null; try { f = JSON.parse("{" + d + "}") } catch (p) { } if (f) { var n = f.progressive; n && setTimeout(function () { for (var p = 0; p < n.length; p++)a.G({ id: B(n[p].url), 1: "GET", 2: n[p].url, fEx: "mp4", 4: "MP4 File " + n[p].quality }, window.location.href, null, !1) }, 2E3); break } }
     }; M.Z = function (a) { var b = this.h[a]; if (b) { try { if (this.panelTracker) this.panelTracker.unwatch(b); b.g.remove(); } catch (d) { } delete this.h[a]; if (!Object.keys(this.h).length && this.panelTracker) { this.panelTracker.dispose(); this.panelTracker = null; } } }; M.mediaTitles = function (id) {
@@ -275,7 +275,7 @@ if (!window.m) {
         return titles.filter(Boolean);
     }; M.ia = function (id) {
         var resource = this.D[id];
-        if (resource) this.port.postMessage([6, resource, window.location.href,
+        if (resource) this.sendPortMessage([6, resource, window.location.href,
             this.getTitle(), K(resource), this.mediaTitles(id)]);
     }; M.mediaElements = function () {
         var found = Array.from(document.querySelectorAll('video,audio'));
@@ -336,7 +336,7 @@ if (!window.m) {
             var b = parseInt(a.getAttribute("JM_NEAT")); b || (b = this.ba << 10 | this.Counter++, a.setAttribute("JM_NEAT",
                 b)); return b
         } catch (d) { }
-    }; M.getTitle = function () { var a = ""; try { a = document.title || document.getElementsByTagName("title")[0].innerText, a = a.trim() } catch (b) { } return a ? a = a.replace(/[ \t\r\n\u25B6]+/g, " ").trim() : "" }; M.R = function (a) { 8 != a.keyCode && 46 != a.keyCode || this.port.postMessage([4, "keydown" == a.type]) }; M.P = function (a) { 0 == a.button && (this.T = a.clientX, this.U = a.clientY) }; M.na = function () { if (this.panelTracker) this.panelTracker.schedule(); };
+    }; M.getTitle = function () { var a = ""; try { a = document.title || document.getElementsByTagName("title")[0].innerText, a = a.trim() } catch (b) { } return a ? a = a.replace(/[ \t\r\n\u25B6]+/g, " ").trim() : "" }; M.R = function (a) { 8 != a.keyCode && 46 != a.keyCode || this.sendPortMessage([4, "keydown" == a.type]) }; M.P = function (a) { 0 == a.button && (this.T = a.clientX, this.U = a.clientY) }; M.na = function () { if (this.panelTracker) this.panelTracker.schedule(); };
     M.trackPanels = function () {
         if (!this.panelTracker) this.panelTracker = new NeatPanelTracker(this);
         for (var id in this.h) if (this.h[id].g) this.panelTracker.watch(this.h[id]);
@@ -389,7 +389,7 @@ if (!window.m) {
             }
         } catch (failure) { error = failure.name === "AbortError" ? "frame timeout" : "frame fetch failed"; }
         finally { clearTimeout(timer); }
-        try { this.port.postMessage([18, id, text, error]); } catch (failure) { }
+        try { this.sendPortMessage([18, id, text, error]); } catch (failure) { }
     }; M.V = function (a) {
         var b = this; switch (a[0]) {
             case 17: b.probeHls(a[1], a[2]); break;
@@ -405,15 +405,25 @@ if (!window.m) {
     }; M.$ = function () { this.na(); }; M.connectPort = function () {
         if (this.pageHidden || this.port || this.contextInvalidated) return;
         var port;
-        try { port = chrome.runtime.connect({ name: "neat" }); }
+        try {
+            port = chrome.runtime.connect({ name: "neat" });
+            port.onMessage.addListener(this.V.bind(this));
+            port.onDisconnect.addListener(this.W.bind(this));
+        }
         catch (error) {
             if (!/extension context invalidated/i.test(error.message)) throw error;
             this.contextInvalidated = true;
             return;
         }
         this.port = port;
-        port.onMessage.addListener(this.V.bind(this));
-        port.onDisconnect.addListener(this.W.bind(this));
+    }; M.sendPortMessage = function (message) {
+        if (this.contextInvalidated || !this.port) return;
+        try { this.port.postMessage(message); }
+        catch (error) {
+            if (!/extension context invalidated|disconnected port/i.test(error.message)) throw error;
+            this.port = null;
+            if (/extension context invalidated/i.test(error.message)) this.contextInvalidated = true;
+        }
     }; M.onPageHide = function () {
         this.pageHidden = true;
         // Clear the reference even when a reload has invalidated the old port.
@@ -444,7 +454,14 @@ function notifyBypass(event) {
     if (!(event.ctrlKey || event.altKey || event.metaKey || event.shiftKey)) return;
     var link = event.target.closest && event.target.closest('a[href]');
     if (link && /^https?:$/.test(link.protocol))
-        chrome.runtime.sendMessage({ action: "__ndm_bypass", url: link.href });
+        try {
+            chrome.runtime.sendMessage({ action: "__ndm_bypass", url: link.href }, function () {
+                // Consume delivery failures if the background has gone away.
+                void chrome.runtime.lastError;
+            });
+        } catch (error) {
+            if (!/extension context invalidated/i.test(error.message)) throw error;
+        }
 }
 document.addEventListener('pointerdown', notifyBypass, true);
 document.addEventListener('click', notifyBypass, true);
