@@ -403,14 +403,29 @@ if (!window.m) {
         if (this.panelTracker) this.panelTracker.dispose();
         this.panelTracker = null;
     }; M.$ = function () { this.na(); }; M.connectPort = function () {
-        if (this.pageHidden || this.port) return;
-        var port = chrome.runtime.connect({ name: "neat" });
+        if (this.pageHidden || this.port || this.contextInvalidated) return;
+        var port;
+        try { port = chrome.runtime.connect({ name: "neat" }); }
+        catch (error) {
+            if (!/extension context invalidated/i.test(error.message)) throw error;
+            this.contextInvalidated = true;
+            return;
+        }
         this.port = port;
         port.onMessage.addListener(this.V.bind(this));
         port.onDisconnect.addListener(this.W.bind(this));
     }; M.onPageHide = function () {
         this.pageHidden = true;
-        if (this.port) { this.port.disconnect(); this.port = null; }
+        // Clear the reference even when a reload has invalidated the old port.
+        var port = this.port;
+        this.port = null;
+        if (port) {
+            try { port.disconnect(); }
+            catch (error) {
+                if (!/extension context invalidated/i.test(error.message)) throw error;
+                this.contextInvalidated = true;
+            }
+        }
     }; M.onPageShow = function (event) {
         this.pageHidden = false;
         if (event.persisted || !this.port) this.connectPort();

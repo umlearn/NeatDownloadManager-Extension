@@ -17,16 +17,21 @@ function setup() {
     document.location = window.location;
     document.title = 'Example video';
     const ports = [];
-    let disconnectError, errorReads = 0;
+    let disconnectError, errorReads = 0, invalidated = false, connectAttempts = 0;
     const chrome = {
         runtime: {
             getURL: name => name,
             connect() {
+                connectAttempts++;
+                if (invalidated) throw new Error('Extension context invalidated.');
                 const port = { messages: [], disconnected: false,
                     onMessage: { addListener(listener) { port.receive = listener; } },
                     onDisconnect: { addListener(listener) { port.onClosed = listener; } },
                     postMessage(message) { port.messages.push(message); },
-                    disconnect() { port.disconnected = true; } };
+                    disconnect() {
+                        if (invalidated) throw new Error('Extension context invalidated.');
+                        port.disconnected = true;
+                    } };
                 ports.push(port);
                 return port;
             },
@@ -38,6 +43,8 @@ function setup() {
     const context = vm.createContext({ window, document, chrome, URL, setTimeout, clearTimeout });
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'ct.js'), 'utf8'), context);
     return { window, ports,
+        invalidate() { invalidated = true; },
+        connectAttempts: () => connectAttempts,
         fire(type, event) { for (const listener of window.listeners[type] || []) listener(event); },
         close(port, error) { disconnectError = error; port.onClosed(port); disconnectError = undefined; },
         errorReads: () => errorReads };
@@ -75,4 +82,31 @@ test('a BFCache disconnect waits for page restoration even if pagehide was misse
     assert.equal(page.ports.length, 1);
     page.fire('pageshow', { persisted: true });
     assert.equal(page.ports.length, 2);
+});
+
+test('pagehide safely releases an invalidated port and does not reconnect on restore', () => {
+    const page = setup();
+    page.invalidate();
+    assert.doesNotThrow(() => page.fire('pagehide', { persisted: true }));
+    assert.doesNotThrow(() => page.fire('pagehide', { persisted: true }));
+    assert.doesNotThrow(() => page.fire('pageshow', { persisted: true }));
+    assert.equal(page.connectAttempts(), 1);
+});
+
+test('restoring a cached page after extension reload safely stops reconnecting', () => {
+    const page = setup();
+    page.fire('pagehide', { persisted: true });
+    page.invalidate();
+    assert.doesNotThrow(() => page.fire('pageshow', { persisted: true }));
+    assert.doesNotThrow(() => page.fire('pageshow', { persisted: false }));
+    assert.equal(page.connectAttempts(), 2);
+    assert.equal(page.ports.length, 1);
+});
+
+test('disconnect after extension reload safely handles a failed reconnect', () => {
+    const page = setup();
+    page.invalidate();
+    assert.doesNotThrow(() => page.close(page.ports[0]));
+    assert.doesNotThrow(() => page.fire('pageshow', { persisted: false }));
+    assert.equal(page.connectAttempts(), 2);
 });
