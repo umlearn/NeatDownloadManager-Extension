@@ -5,15 +5,47 @@ function K(c) { return c ? !c.fEx || "VTT" != c.fEx.toUpperCase() && "SRT" != c.
     controller.h[id] = this;
     this.oa = id;
     this.l = media;
+    this.mediaParent = media && media.parentElement;
     this.g = null;
     this.i = null;
     this.items = [];
     this.position = { left: 0, top: 0 };
     this.closed = false;
 }
+function neatMediaHasLayout(media) {
+    if (!media || !media.isConnected) return false;
+    var rect = media.getBoundingClientRect(), style = getComputedStyle(media);
+    return rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
+        style.visibility !== 'hidden' && style.visibility !== 'collapse';
+}
 var M = L.prototype;
+M.refreshAnchor = function () {
+    if (!this.l || neatMediaHasLayout(this.l)) return;
+    // Players may retain a hidden video after switching ads or playback engines.
+    // Stay within its original container instead of jumping to unrelated videos.
+    var parent = this.l.parentElement || this.mediaParent;
+    if (!parent || !parent.isConnected || parent === document.body || parent === document.documentElement) return;
+    var candidates = Array.from(parent.querySelectorAll('video,audio')).filter(neatMediaHasLayout);
+    var playing = candidates.filter(function (media) { return !media.paused; });
+    var next = playing.length === 1 ? playing[0] : candidates.length === 1 ? candidates[0] : null;
+    if (!next) return;
+    var tracker = this.v.panelTracker;
+    if (tracker) {
+        tracker.resize.unobserve(this.l);
+        tracker.intersection.unobserve(this.l);
+    }
+    this.l = next;
+    this.mediaParent = next.parentElement;
+    this.clipParents = null;
+    this.inView = undefined;
+    if (tracker) {
+        tracker.resize.observe(next);
+        tracker.intersection.observe(next);
+    }
+};
 M.s = function () {
     if (!this.g) return;
+    if (!this.closed && this.v.C && !document.hidden) this.refreshAnchor();
     var visible = this.v.C && !this.closed && !document.hidden && this.inView !== false;
     var left = 12, top = 12;
     if (this.l && visible) {
@@ -321,6 +353,7 @@ if (!window.m) {
     }; M.onMediaActive = function (event) {
         if (event.target instanceof HTMLMediaElement) {
             if (event.type === 'play') this.lastActiveMedia = event.target;
+            this.na();
             var panel = this.h[0];
             if (panel && panel.g && !panel.l && this.mediaElements().length === 1) {
                 panel.l = event.target;
